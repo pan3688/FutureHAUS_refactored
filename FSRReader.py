@@ -18,6 +18,8 @@ CHANNEL = 0
 # threshold values -- TODO -- convert into grams or ohms
 HT = 10000
 LT = 1000
+ALERT_WT = 50
+ALERT_PIN = 27
 
 # resistance values used in the circuit
 circuit_resistance = 20000
@@ -37,6 +39,11 @@ class FSR_ADC:
         # for integration with ThingSpeak
         self.thingSpeak = ThingSpeak()
 
+        # to create an alert on PI
+        GPIO.setmode(GPIO.BCM)
+        GPIO.setwarnings(False)
+        GPIO.setup(ALERT_PIN, GPIO.OUT)
+
     def read_FSR(self):
         CUR = self.adc.start_adc_comparator(CHANNEL,
                                HT, LT,
@@ -48,12 +55,23 @@ class FSR_ADC:
         i = 0
         val_array = []
 
+        """
+        This is an infinite loop to read the force sensor continuously
+        """
         while True:
             cur_value = self.adc.get_last_result()
             cur_force = self.get_force(cur_value)
 
+            if cur_force >= ALERT_WT:
+                self.create_alert()
+                #break # REMOVE -- just for testing
+                #GPIO.cleanup()
+
             val_array.append(cur_force)
-            #print ('Current channel {} value is {} = {} grams; at iteration {}'.format(CHANNEL, cur_value, cur_force, i))
+            
+            # Comment this line while actual testing
+            # print ('Current channel {} value is {} = {} grams; at iteration {}'.format(CHANNEL, cur_value, cur_force, i))
+
             i += 1
 
             if i >= num_observations:
@@ -73,6 +91,16 @@ class FSR_ADC:
         cur_resistance = circuit_resistance * adc_value / (max_adc - circuit_resistance)
         cur_force = ((math.log(144000000 / cur_resistance)) * math.log(100))/ math.log(24000)
         return math.pow(cur_force, math.e)
+
+    def create_alert(self):
+        GPIO.output(ALERT_PIN, 1)
+
+        # TODO -- update ThingSpeak and withdraw the alert pin signal
+        # REMOVE the print and sleep
+        #print "Sleeping for 5 seconds because of the ALERT!"
+        #time.sleep(5)
+        
+        GPIO.output(ALERT_PIN, 0)
 
 if __name__== "__main__":
     fsr = FSR_ADC()

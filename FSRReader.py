@@ -6,6 +6,7 @@ import time
 import Adafruit_ADS1x15
 import math
 import RPi.GPIO as GPIO
+import threading
 
 from ThingSpeak import ThingSpeak
 
@@ -31,20 +32,28 @@ max_adc = 32767
 num_observations = 5
 sleep_interval = 5 # in seconds
 
-class FSR_ADC:
+class FSR_ADC():
     def __init__(self):
         # instantiate the ADC library
         self.adc = Adafruit_ADS1x15.ADS1115()
 
         # for integration with ThingSpeak
-        self.thingSpeak = ThingSpeak()
+        # self.thingSpeak = ThingSpeak()
 
         # to create an alert on PI
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
         GPIO.setup(ALERT_PIN, GPIO.OUT)
 
+    def __call__(self):
+        pass
+
+    def run(self):
+        self.read_FSR
+
     def read_FSR(self):
+        print "Starting thread to read FSR..."
+
         CUR = self.adc.start_adc_comparator(CHANNEL,
                                HT, LT,
                                gain = GAIN,
@@ -64,25 +73,26 @@ class FSR_ADC:
 
             if cur_force >= ALERT_WT:
                 self.create_alert()
+                #self.thingSpeak.update_fsr_channel(cur_force)
+                print "Cur force : \t" + str(cur_force)
                 #break # REMOVE -- just for testing
-                #GPIO.cleanup()
+                # GPIO.cleanup()
 
             val_array.append(cur_force)
             
             # Comment this line while actual testing
-            # print ('Current channel {} value is {} = {} grams; at iteration {}'.format(CHANNEL, cur_value, cur_force, i))
+            print ('Current channel {} value is {} = {} grams; at iteration {}'.format(CHANNEL, cur_value, cur_force, i))
 
             i += 1
 
             if i >= num_observations:
                 avg_force = float(sum(val_array)) / len(val_array)
-                #print "Average force = " + str(avg_force)
+                #self.thingSpeak.update_fsr_channel(avg_force)
+                print "Average force = " + str(avg_force)
                 val_array = []
                 i = 0
 
             # updating the ThingSpeak channel
-            #print thingSpeak.update_fsr_channel(cur_force)
-
             time.sleep(sleep_interval)
 
         self.adc.stop_adc()
@@ -94,12 +104,10 @@ class FSR_ADC:
 
     def create_alert(self):
         GPIO.output(ALERT_PIN, 1)
-
         # TODO -- update ThingSpeak and withdraw the alert pin signal
         # REMOVE the print and sleep
-        #print "Sleeping for 5 seconds because of the ALERT!"
-        #time.sleep(5)
-        
+        # print "Sleeping for 5 seconds because of the ALERT!"
+        time.sleep(5)
         GPIO.output(ALERT_PIN, 0)
 
 if __name__== "__main__":

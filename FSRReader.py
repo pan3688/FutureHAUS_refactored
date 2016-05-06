@@ -14,7 +14,7 @@ import logging
 # Gain (multiplier) -- keep this 1
 GAIN = 2 
 
-# the channel id which is reading the sensor value
+# ADC channel that is reading the FSR
 CHANNEL = 0
 
 # threshold values
@@ -61,6 +61,7 @@ class FSR_ADC():
 
     def read_FSR(self):
         logging.info(threading.current_thread().name  + " reading FSR")
+        zero_value = -1
 
         try:
             CUR = self.adc.start_adc_comparator(CHANNEL,
@@ -70,9 +71,13 @@ class FSR_ADC():
                                active_low = True,
                                num_readings = 1,
                                latching = True)
+            zero_value = self.get_force(CUR)
+            logging.info("zero value = " + str(zero_value))
+
         except e as Exception:
             logging.critical("Error while reading sensor value")
 
+        prev = zero_value
         """
         This is an infinite loop to read the force sensor continuously
         """
@@ -84,35 +89,41 @@ class FSR_ADC():
             self.lock.acquire(True)
 
             cur_periodic = self.periodic
-            if not self.raw:
-                cur_force = self.get_force(cur_value)
 
-            if cur_force >= self.threshold:
-                #self.create_alert()
-                self.update_fsr_channel(cur_force)
-                logging.debug("Cur force : \t" + str(cur_force))
+            # for accurate weight, more calibration is required
+            if not self.raw:
+                cur_force = self.get_force(cur_value) - zero_value
+
+            cur_threshold = self.threshold
 
             self.lock.release()
 
             # Comment this line while actual testing
-            logging.debug("Current channel " + str(CHANNEL) + " value is : " + str (cur_value))
+            logging.debug("Current ADC channel " + str(CHANNEL) + " value is : " + str (cur_force))
 
             # updating the ThingSpeak channel
             if self.periodic:
                 self.update_fsr_channel(cur_force)
+            elif cur_force - prev >= cur_threshold:
+                self.update_fsr_channel(cur_force)
 
-            #Blocking call, if command reader is updating sleep interval
+            """
+            Blocking call, if command reader thread is updating sleep interval
+            then let it complete the update operation
+            """
             self.lock.acquire(True)
-            # meanwhile, the command reader thread won't be able to update sleep_interval
+            cur_interval = self.sleep_interval
             self.lock.release()
 
             try:
-                # sleeping before reading the sensor again
-                time.sleep(self.sleep_interval)
+                logging.debug(threading.current_thread().name + " sleeping before reading the sensor again")
+                time.sleep(cur_interval)
             except Exception as e:
                 logging.error(threading.current_thread().name + " sleep exception.")
 
-        logging.debug("Stopping ADC")
+            prev = cur_force
+
+        logging.info("Stopping " + threading.current_thread().name)
         self.adc.stop_adc()
 
     def update_fsr_channel(self,cur_value):
@@ -160,6 +171,8 @@ class FSR_ADC():
                     logging.debug("Command is null(None)!")
 
                 if do_update:
+                    logging.debug("Locking the FSR object for updating parameters")
+
                     self.lock.acquire(True)
                     self.sleep_interval = temp_sleep_interval
                     self.threshold = temp_threshold
@@ -179,6 +192,7 @@ class FSR_ADC():
             #sleep for 1 second and read the command again
             time.sleep(self.reader_sleep)
 
+        logging.info("Stopping " + threading.current_thread().name)
         return command
 
     def get_force(self,adc_value):

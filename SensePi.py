@@ -30,7 +30,7 @@ class SensePi:
         #print "Log file is : " + logfile
 
         loglevel = self.config.get("logging","loglevel")
-        logging.basicConfig(filename=logfile, format='%(asctime)s\t%(filename)s\t%(funcName)s\t%(levelname)s\t%(message)s', level=loglevel)
+        logging.basicConfig(filename=logfile, format='%(asctime)s\t%(levelname)s\t%(funcName)s\t%(filename)s\t%(message)s', level=loglevel)
 
         logging.info("Logging started")
 
@@ -39,10 +39,15 @@ class SensePi:
 
 if  __name__=="__main__":
     sensePi = SensePi()
-    t = threading.Thread(target = FSR_ADC(sensePi.config).read_FSR)
+    fsr = FSR_ADC(sensePi.config)
+
+    t_reader = threading.Thread(target = fsr.read_command)
+    t_reader.setDaemon(True)
+    t_reader.start()
+
+    t = threading.Thread(target = fsr.read_FSR)
     t.setDaemon(True)
     t.start()
 
-    while True:
-        print "main thread..."
-        time.sleep(4)
+    t_reader.join()
+    t.join()

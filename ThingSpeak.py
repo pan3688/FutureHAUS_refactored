@@ -9,15 +9,16 @@ class ThingSpeak:
     def __init__(self):
         pass
     
-    def readCommand(self, hostname, readAPIKey, channelId, fieldId):
+    def readChannel(self, hostname, readAPIKey, channelId, fieldId):
         url = hostname + "/channels/" + channelId + "/field/" + fieldId + "/last?key=" + readAPIKey
         logging.debug("Reading data from:\t" + url)
 
         ret = None
         try:
-            ret = urllib2.urlopen(url)
-        except e as Exception:
-            logging.error("Error reading thingSpeak channel " + e)
+            ret = urllib2.urlopen(url).read()
+            logging.debug("Read command :" + str(ret))
+        except Exception as e:
+            logging.error("Error reading thingSpeak channel " + str(e))
 
         return ret
     
@@ -28,20 +29,10 @@ class ThingSpeak:
         ret = None
         try:
             ret = urllib2.urlopen(url)
-        except e as Exception:
-            logging.critical("Error updating thingSpeak channel " + e)
+        except Exception as e:
+            logging.critical("Error updating thingSpeak channel " + str(e))
 
         return ret
-
-    """
-    def update_fsr_channel(self, value):
-        fieldID = 1
-        hostname = "https://api.thingspeak.com"
-        writeAPIKey = "3XICIX7N986U4JAS"
-        readAPIKey = None
-
-        return self.updateChannel(hostname, writeAPIKey, fieldID, value).read()
-    """
 
 # FOR testing
 if __name__=="__main__":

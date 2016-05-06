@@ -4,6 +4,11 @@ import urllib2
 import random as rand
 import time
 
+"""
+This is a test script, used to send commands to ThingSpeak upstream,
+in the absense of a UI
+"""
+
 host = "https://api.thingspeak.com"
 writeKey = "3XICIX7N986U4JAS"
 readKey = "9HET1Q6CL50BYB15"

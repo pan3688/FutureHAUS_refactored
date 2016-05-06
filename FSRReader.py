@@ -25,13 +25,31 @@ ALERT_PIN = 27
 # max value of ADC
 max_adc = 32767
 
-class FSR_ADC():
-    def __init__(self, configmap):
+class FSR():
+    def __init__(self, configmap, forceSensor):
+        self.config = configmap
+        self.sleep_interval = int(configmap.get(forceSensor,"sleep_interval"))
+        self.reader_sleep = int(configmap.get(forceSensor,"reader_interval"))
+
+        # resistance values used in the circuit
+        self.circuit_resistance = int(configmap.get("ForceSensor","cicuit_resistance")) #ohms
+        self.readAPIKey = configmap.get(forceSensor,"readAPIKey")
+        self.writeAPIKey = configmap.get(forceSensor,"writeAPIKey")
+        self.upstream = configmap.get(forceSensor, "FSR_upstream_channel")
+        self.downstream = configmap.get(forceSensor, "FSR_command_channel")
+        self.read_channelID = configmap.get(forceSensor, "FSR_read_channelID")
+
+        self.hostname = configmap.get("ThingSpeak","hostname")
+
+class FSR_ADC_Worker():
+    def __init__(self, configmap, fsr, thingSpeak, adc):
         # instantiate the ADC library
-        self.adc = Adafruit_ADS1x15.ADS1115()
+        self.adc = adc
 
         # for integration with ThingSpeak
-        self.thingSpeak = ThingSpeak()
+        self.thingSpeak = thingSpeak
+
+        self.fsr = fsr
 
         # to create an alert on PI, NOT used
         GPIO.setmode(GPIO.BCM)
@@ -39,20 +57,6 @@ class FSR_ADC():
         GPIO.setup(ALERT_PIN, GPIO.OUT)
 
         self.config = configmap
-
-        # for periodic sampling
-        self.sleep_interval = int(configmap.get("ForceSensor","sleep_interval"))
-        self.reader_sleep = int(configmap.get("ForceSensor","reader_interval"))
-
-        # resistance values used in the circuit
-        self.circuit_resistance = int(configmap.get("ForceSensor","cicuit_resistance")) #ohms
-
-        self.hostname = configmap.get("ThingSpeak","hostname")
-        self.readAPIKey = configmap.get("ThingSpeak","readAPIKey")
-        self.writeAPIKey = configmap.get("ThingSpeak","writeAPIKey")
-        self.upstream = configmap.get("ThingSpeak", "FSR_upstream_channel")
-        self.downstream = configmap.get("ThingSpeak", "FSR_command_channel")
-        self.read_channelID = configmap.get("ThingSpeak", "FSR_read_channelID")
 
         self.lock = threading.Lock()
         self.raw = False

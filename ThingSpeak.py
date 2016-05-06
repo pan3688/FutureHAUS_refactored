@@ -6,9 +6,17 @@ import logging
 
 class ThingSpeak:
 
+    """
+    Constructor for ThingSpeak object; doesn't have its own fields, so
+    any module can use it to connect with any field of any ThingSpeak
+    channel, by providing the connection parameters to this object's methods
+    """
     def __init__(self):
         pass
-    
+
+    """
+    Read a ThingSpeak channel
+    """
     def readChannel(self, hostname, readAPIKey, channelId, fieldId):
         url = hostname + "/channels/" + channelId + "/field/" + fieldId + "/last?key=" + readAPIKey
         logging.debug("Reading data from:\t" + url)
@@ -21,7 +29,10 @@ class ThingSpeak:
             logging.error("Error reading thingSpeak channel " + str(e))
 
         return ret
-    
+
+    """
+    Write to a ThingSpeak channel
+    """
     def updateChannel(self, hostname, writeAPIKey, fieldId, value):
         url = hostname + "/update?api_key=" + writeAPIKey + "&" + str(fieldId) + "=" + str(value)
         logging.debug("Updating channel at:\t" + url)
@@ -38,5 +49,4 @@ class ThingSpeak:
 if __name__=="__main__":
     thingSpeak = ThingSpeak()
     #print thingSpeak.updateChannel("PHTKY9VQ9FIEYRWB", "1", "8888").read()
-    #print thingSpeak.readCommand("QOT8G5E9VF7YW10S", "108160", "1").read()
-    thingSpeak.update_fsr_channel(24)
+    #print thingSpeak.readChannel("QOT8G5E9VF7YW10S", "108160", "1").read()

@@ -11,7 +11,7 @@ import threading
 from ThingSpeak import ThingSpeak
 import logging
 
-# Gain (multiplier) -- keep this 1
+# Gain (multiplier) -- keep this 2 
 GAIN = 2 
 
 # ADC channel that is reading the FSR
@@ -33,7 +33,7 @@ class FSR_ADC():
         # for integration with ThingSpeak
         self.thingSpeak = ThingSpeak()
 
-        # to create an alert on PI
+        # to create an alert on PI, NOT used
         GPIO.setmode(GPIO.BCM)
         GPIO.setwarnings(False)
         GPIO.setup(ALERT_PIN, GPIO.OUT)
@@ -71,6 +71,8 @@ class FSR_ADC():
                                active_low = True,
                                num_readings = 1,
                                latching = True)
+            
+	    # The value FSR reports, when no force is applied (error value)
             zero_value = self.get_force(CUR)
             logging.info("zero value = " + str(zero_value))
 
@@ -87,34 +89,32 @@ class FSR_ADC():
             cur_force = cur_value
 
             self.lock.acquire(True)
-
-            cur_periodic = self.periodic
-
+            """
+            Acquired the FSR object lock, read the required parameters,
+            such as threshold, raw data boolean AND
+            sampling_period (sleep interval for this thread) 
+            
+            """
             # for accurate weight, more calibration is required
             if not self.raw:
                 cur_force = self.get_force(cur_value) - zero_value
 
             cur_threshold = self.threshold
-
+            cur_interval = self.sleep_interval
             self.lock.release()
 
-            # Comment this line while actual testing
             logging.debug("Current ADC channel " + str(CHANNEL) + " value is : " + str (cur_force))
 
             # updating the ThingSpeak channel
             if self.periodic:
                 self.update_fsr_channel(cur_force)
-            elif cur_force - prev >= cur_threshold:
+            elif math.fabs(cur_force - prev) >= cur_threshold:
                 self.update_fsr_channel(cur_force)
 
             """
             Blocking call, if command reader thread is updating sleep interval
             then let it complete the update operation
             """
-            self.lock.acquire(True)
-            cur_interval = self.sleep_interval
-            self.lock.release()
-
             try:
                 logging.debug(threading.current_thread().name + " sleeping before reading the sensor again")
                 time.sleep(cur_interval)
@@ -165,13 +165,14 @@ class FSR_ADC():
                             do_update = True
                             next_periodic = False
 
-                    if temp_raw.lower() != str(self.raw).lower:
+                    if temp_raw.lower() != str(self.raw).lower():
                         do_update = True
                 else:
                     logging.debug("Command is null(None)!")
 
                 if do_update:
-                    logging.debug("Locking the FSR object for updating parameters")
+                    logging.debug(threading.current_thread().name + 
+                      "Locking the FSR object for updating its parameters")
 
                     self.lock.acquire(True)
                     self.sleep_interval = temp_sleep_interval
@@ -189,13 +190,20 @@ class FSR_ADC():
             except Exception as e:
                 logging.error(str(e))
 
-            #sleep for 1 second and read the command again
+            #sleep for 1 second and read the command from ThingSpeak again
             time.sleep(self.reader_sleep)
 
         logging.info("Stopping " + threading.current_thread().name)
         return command
 
     def get_force(self,adc_value):
+        """
+        These parametric constants of these equations are derived by
+        looking at the data sheet of the FSR, and their derivation
+        depends on the circuit design, HENCE change these equations
+        if your circuit design differs from the one we have in our
+        documentation
+        """
         cur_resistance = self.circuit_resistance * adc_value / (max_adc - self.circuit_resistance)
         cur_force = ((math.log(144000000 / cur_resistance)) * math.log(100))/ math.log(24000)
         return math.pow(cur_force, math.e)
@@ -208,6 +216,7 @@ class FSR_ADC():
         time.sleep(self.sleep_interval)
         GPIO.output(ALERT_PIN, 0)
 
+#FOR TESTING the FSR and ADC without ThingSpeak
 if __name__== "__main__":
     fsr = FSR_ADC()
     fsr.read_FSR()
